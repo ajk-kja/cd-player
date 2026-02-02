@@ -8,11 +8,13 @@ export function JewelCase({ track, index, position }) {
   const meshRef = useRef()
   const discRef = useRef()
   const glowRef = useRef()
+  const caseFrontRef = useRef()
   const [hovered, setHovered] = useState(false)
 
   const viewMode = useStore((state) => state.viewMode)
   const isPlaying = useStore((state) => state.isPlaying)
   const currentTrack = useStore((state) => state.currentTrack)
+  const cameraDistance = useStore((state) => state.cameraDistance)
   const setViewMode = useStore((state) => state.setViewMode)
   const setCurrentTrack = useStore((state) => state.setCurrentTrack)
   const setIsPlaying = useStore((state) => state.setIsPlaying)
@@ -20,7 +22,7 @@ export function JewelCase({ track, index, position }) {
   const coverTexture = useTexture(track.coverUrl)
   coverTexture.colorSpace = THREE.SRGBColorSpace
 
-  const isFocused = viewMode === 'FOCUS' && currentTrack === index
+  const isFocused = viewMode === 'ALBUM' && currentTrack === index
   const isThisTrack = currentTrack === index
   const showGlow = viewMode === 'SHELF'
 
@@ -63,16 +65,33 @@ export function JewelCase({ track, index, position }) {
       const pulse = 0.3 + Math.sin(time * 1.5 + index * 0.8) * 0.25
       glowRef.current.material.opacity = pulse
     }
+
+    // Immersion mode: fade out case front when zoomed in while playing
+    if (caseFrontRef.current && isFocused) {
+      const immersionActive = cameraDistance <= 3 && isPlaying
+      const targetOpacity = immersionActive ? 0 : 0.2
+      caseFrontRef.current.material.opacity = THREE.MathUtils.lerp(
+        caseFrontRef.current.material.opacity,
+        targetOpacity,
+        delta * 3
+      )
+    }
   })
 
   const handleClick = (e) => {
     e.stopPropagation()
-    // Only select albums from shelf view - back button handles returning to shelf
     if (viewMode === 'SHELF') {
+      // Select album from shelf view
       setCurrentTrack(index)
-      setViewMode('FOCUS')
+      setViewMode('ALBUM')
       // Auto-play when album is selected
       setTimeout(() => setIsPlaying(true), 100)
+    } else if (viewMode === 'TV' || viewMode === 'POSTER') {
+      // Return to shelf from TV or poster view (music keeps playing)
+      setViewMode('SHELF')
+    } else if (viewMode === 'ALBUM' && currentTrack !== index) {
+      // Different album clicked while in album view - return to shelf first
+      setViewMode('SHELF')
     }
   }
 
@@ -110,7 +129,7 @@ export function JewelCase({ track, index, position }) {
       </mesh>
 
       {/* Case front (transparent) */}
-      <mesh position={[0, 0, 0.04]} castShadow>
+      <mesh ref={caseFrontRef} position={[0, 0, 0.04]} castShadow>
         <boxGeometry args={[0.5, 0.55, 0.02]} />
         <meshStandardMaterial
           color="#ffffff"
@@ -135,7 +154,7 @@ export function JewelCase({ track, index, position }) {
         </mesh>
       )}
 
-      {/* CD Disc (visible when focused) - rotated to face viewer */}
+      {/* CD Disc (visible only when focused in ALBUM view) - rotated to face viewer */}
       {isFocused && (
         <group position={[0.6, 0, 0]}>
           <group ref={discRef}>

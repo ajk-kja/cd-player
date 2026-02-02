@@ -40,7 +40,7 @@ export function Shelf() {
   }
 
   return (
-    <group ref={groupRef} position={[0, 0, 0]}>
+    <group ref={groupRef} position={[0, 0, -4]}>
       {/* Shelf boards */}
       {shelfYPositions.map((y, i) => (
         <ShelfBoard key={`shelf-${i}`} position={[0, y, 0]} />
