@@ -1,0 +1,18 @@
+# CD Player - Standalone Docker Compose
+# 3D vinyl visualizer built with React + Three.js
+
+services:
+  cd-player:
+    build: .
+    container_name: cd-player
+    restart: unless-stopped
+    ports:
+      - "3000:80"
+    volumes:
+      - ./dist:/usr/share/nginx/html:ro
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://127.0.0.1/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 5s
