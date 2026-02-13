@@ -6,6 +6,7 @@ export function AudioManager() {
   const audioContextRef = useRef(null)
   const analyzerRef = useRef(null)
   const sourceRef = useRef(null)
+  const gainNodeRef = useRef(null)
   const dataArrayRef = useRef(null)
   const currentTrackRef = useRef(null)
   const prevTrackRef = useRef(null)
@@ -38,8 +39,15 @@ export function AudioManager() {
       analyzerRef.current.fftSize = 256
       analyzerRef.current.smoothingTimeConstant = 0.8
 
+      // Create GainNode for iOS-compatible volume control
+      gainNodeRef.current = audioContextRef.current.createGain()
+      gainNodeRef.current.gain.value = 0.7 // Default volume
+
       sourceRef.current = audioContextRef.current.createMediaElementSource(audio)
-      sourceRef.current.connect(analyzerRef.current)
+      
+      // Connect: source -> gain -> analyzer -> destination
+      sourceRef.current.connect(gainNodeRef.current)
+      gainNodeRef.current.connect(analyzerRef.current)
       analyzerRef.current.connect(audioContextRef.current.destination)
 
       const bufferLength = analyzerRef.current.frequencyBinCount
@@ -157,11 +165,25 @@ export function AudioManager() {
     }
   }, [isPlaying, resumeAudioContext])
 
-  // Volume control
+  // Volume control (iOS-compatible via Web Audio API GainNode)
   useEffect(() => {
     const audio = audioRef.current
     if (!audio) return
-    audio.volume = isMuted ? 0 : isDimmed ? 0.5 : volume
+
+    // Calculate target volume
+    const targetVolume = isMuted ? 0 : isDimmed ? 0.5 : volume
+
+    // Use GainNode if available (iOS-compatible), fallback to audio.volume
+    if (gainNodeRef.current && audioContextRef.current) {
+      // Use GainNode (Web Audio API) - works on all platforms including iOS
+      gainNodeRef.current.gain.setValueAtTime(
+        targetVolume,
+        audioContextRef.current.currentTime
+      )
+    } else {
+      // Fallback for initial setup before GainNode is connected
+      audio.volume = targetVolume
+    }
   }, [volume, isMuted, isDimmed])
 
   // Cycle visualizer on track change
